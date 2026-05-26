@@ -187,6 +187,8 @@ textarea{resize:vertical;min-height:60px}
     <button class="ni" onclick="goTo('cierre')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>Cierre de caja</button>
     <div class="nav-sec">An&#225;lisis</div>
     <button class="ni" onclick="goTo('resumen')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Resumen</button>
+    <div class="nav-sec">Sistema</div>
+    <button class="ni" onclick="goTo('config')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>Configuraci&#243;n</button>
   </nav>
   <div class="sb-foot">
     <div class="sb-user" id="sb-user"></div>
@@ -268,6 +270,15 @@ textarea{resize:vertical;min-height:60px}
             </div>
           </div>
         </div>
+        <div id="v-descuento-wrap" style="margin-top:8px">
+          <div class="field" style="margin-bottom:0">
+            <label>Descuento adicional (%)</label>
+            <div style="display:flex;align-items:center;gap:8px">
+              <input type="number" id="v-desc-pct" placeholder="0" min="0" max="100" style="width:100px" oninput="vRender()">
+              <span style="font-size:12px;color:var(--txt3)">Ej: 20 = 20% de descuento sobre el total</span>
+            </div>
+          </div>
+        </div>
         <div id="v-acred-info" style="display:none;margin-top:8px;padding:8px 10px;background:var(--bbg);border-radius:var(--r);font-size:12px;color:var(--blue)"></div>
       </div>
     </div>
@@ -279,6 +290,7 @@ textarea{resize:vertical;min-height:60px}
         <div class="tr-r" id="v-tdesc" style="display:none"><span id="v-tdesc-l">Descuento</span><span id="v-tdesc-v" style="color:var(--green)"></span></div>
         <div class="tr-r" id="v-trec" style="display:none"><span id="v-trec-l">Recargo</span><span id="v-trec-v" style="color:var(--amber)"></span></div>
         <div class="tr-r" id="v-tneto" style="display:none"><span id="v-tneto-l" style="color:var(--txt3)">Neto que acredita</span><span id="v-tneto-v" style="color:var(--green)"></span></div>
+        <div class="tr-r" id="v-desc-row" style="display:none;color:var(--green)"><span id="v-desc-row-l">Descuento adicional</span><span id="v-desc-row-v"></span></div>
         <div class="tr-r tr-m"><span>Total a cobrar</span><span id="v-ttotal">$0</span></div>
       </div>
       <div style="margin-top:12px"><button class="btn bp bfull" id="btn-vreg" onclick="vRegistrar()" disabled>Confirmar venta</button></div>
@@ -388,7 +400,7 @@ textarea{resize:vertical;min-height:60px}
       <div class="sp"></div>
     </div>
     <div class="tw"><table>
-      <thead><tr><th>C&#243;digo</th><th>Producto</th><th>Subcat.</th><th>Variante</th><th>Costo</th><th>Lista</th><th>Efvo/Transf/CC/FAST</th><th>D&#233;bito/FINAN YA</th><th>Tarj. cr&#233;d. (neto)</th></tr></thead>
+      <thead><tr><th>C&#243;digo</th><th>Producto</th><th>Subcat.</th><th>Variante</th><th>Costo</th><th>Costo+CF</th><th>Lista</th><th>Efvo/Transf/CC/FAST</th><th>D&#233;bito/FINAN YA</th><th>Tarj. cr&#233;d. (neto)</th></tr></thead>
       <tbody id="prod-tb"></tbody>
     </table></div>
   </div>
@@ -491,6 +503,28 @@ textarea{resize:vertical;min-height:60px}
   </div>
 </div>
 
+
+<div class="sec" id="sec-config">
+  <div class="ph"><div><div class="pt">Configuraci&#243;n</div><div class="ps">Par&#225;metros generales del sistema</div></div></div>
+  <div class="card" style="max-width:600px">
+    <div class="card-t">Costos y m&#225;rgenes</div>
+    <div class="field">
+      <label>Coeficiente de costos fijos (%)</label>
+      <div style="display:flex;align-items:center;gap:10px">
+        <input type="number" id="cfg-coef" placeholder="0.2" min="0" max="100" step="0.01" style="width:120px" oninput="saveConfig()">
+        <span style="font-size:12px;color:var(--txt3)">Se suma al costo de cada producto para calcular el costo real</span>
+      </div>
+      <div id="cfg-coef-ejemplo" style="margin-top:8px;padding:8px 10px;background:var(--surf2);border-radius:var(--r);font-size:12px;color:var(--txt2)"></div>
+    </div>
+    <hr class="dv">
+    <div class="card-t">Acceso al sistema</div>
+    <div style="background:var(--surf2);border-radius:var(--r);padding:12px 14px;font-size:13px">
+      <div style="margin-bottom:6px"><b>AdminSNK</b> — acceso completo</div>
+      <div><b>VentasSNK</b> — acceso completo</div>
+    </div>
+    <div style="margin-top:10px;font-size:12px;color:var(--txt3)">Para cambiar contrase&#241;as contact&#225; al administrador del sistema.</div>
+  </div>
+</div>
 
 </main>
 </div>
@@ -1084,7 +1118,15 @@ function vRender(){
   if(efvo)el('v-tdesc-v').textContent='-'+fmt(lista-cobrado);
   if(rec){el('v-trec-l').textContent='Recargo ('+Math.round(m.rec*100)+'%)';el('v-trec-v').textContent='+'+fmt(cobrado-Math.round(lista*(1-m.desc)));}
   if(showNeto)el('v-tneto-v').textContent=fmt(neto);
-  el('v-ttotal').textContent=fmt(cobrado);
+  // Apply manual discount
+  var descPct2=parseFloat(el('v-desc-pct')?el('v-desc-pct').value:0)||0;
+  var descMonto2=descPct2>0?Math.round(cobrado*descPct2/100):0;
+  var totalFinal2=cobrado-descMonto2;
+  var vdescrow=el('v-desc-row');
+  if(vdescrow)vdescrow.style.display=descPct2>0?'flex':'none';
+  var vdescrowv=el('v-desc-row-v');
+  if(vdescrowv)vdescrowv.textContent='-'+fmt(descMonto2)+' ('+descPct2+'%)';
+  el('v-ttotal').textContent=fmt(totalFinal2);
 }
 function vEstadoChange(){
   var est=el('v-estado').value;
@@ -1100,6 +1142,7 @@ function vRegistrar(){
   var medio=el('v-medio').value,estado=el('v-estado').value,cliente=el('v-cliente').value.trim();
   var fechaVenta=el('v-fecha').value;
   var total=0,totalNeto=0;
+  var descPct=parseFloat(el('v-desc-pct')?el('v-desc-pct').value:0)||0;
   var items=carrito.map(function(item){
     var uBase=calcU(item.pl,item.pe,medio);
     var u=item.custom!==null?item.custom:uBase;
@@ -1107,8 +1150,11 @@ function vRegistrar(){
     DB.s[item.cod]=Math.max(0,(DB.s[item.cod]||0)-item.qty);
     return{cod:item.cod,nombre:item.nombre,cat:item.cat,sub:item.sub,variante:item.variante,qty:item.qty,precio_unit:u,subtotal:sub,costo:item.costo};
   });
+  // Apply manual discount
+  if(descPct>0){var descMonto=Math.round(total*descPct/100);total=total-descMonto;totalNeto=Math.round(totalNeto*(1-descPct/100));}
+  var descuentoAplicado=descPct>0?descPct:0;
   var fechaAcred=acredFecha(fechaVenta,medio);
-  var v={id:uid(),fecha:fechaVenta,hora:new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}),cliente:cliente,obs:el('v-obs').value,medio:medio,canal:el('v-canal').value,estado:estado,items:items,total:total,totalNeto:totalNeto,fechaAcred:fechaAcred,pagos:[]};
+  var v={id:uid(),fecha:fechaVenta,hora:new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}),cliente:cliente,obs:el('v-obs').value,medio:medio,canal:el('v-canal').value,estado:estado,items:items,total:total,totalNeto:totalNeto,fechaAcred:fechaAcred,descuento:descuentoAplicado,pagos:[]};
   if(estado==='Pagado'&&medio!=='Cuenta corriente'){
     v.pagos=[{monto:total,fecha:fechaVenta,medio:medio,nota:'Pago completo'}];
     // registrar en flujo con fecha de acreditacion real
@@ -1132,6 +1178,7 @@ function vRegistrar(){
   showTicket(v);
   carrito=[];el('v-cliente').value='';el('v-obs').value='';el('v-estado').value='Pagado';el('v-fecha').value=tod();
   el('v-parcial-monto').value='';el('v-pago-parcial-wrap').style.display='none';
+  if(el('v-desc-pct'))el('v-desc-pct').value='';
   vRender();updCli();
 }
 
@@ -1643,14 +1690,16 @@ function renderProds(){
       if(q&&p.n.toLowerCase().indexOf(q)<0&&v.cod.toLowerCase().indexOf(q)<0)return;cnt++;
       var debito=Math.round(v.pe*1.05);
       var tcneto=Math.round(v.pl*0.85);
+      var costoReal=getCostoReal(v.costo||0);
       var tr=document.createElement('tr');
-      [v.cod,p.n,p.s,v.t,fmt(v.costo||0),fmt(v.pl),fmt(v.pe),fmt(debito),fmt(tcneto)].forEach(function(txt,ti){
+      [v.cod,p.n,p.s,v.t,fmt(v.costo||0),fmt(costoReal),fmt(v.pl),fmt(v.pe),fmt(debito),fmt(tcneto)].forEach(function(txt,ti){
         var td=document.createElement('td');
         if(ti===0)td.className='mono';if(ti===2||ti===3)td.className='muted';
         if(ti>=4)td.style.fontFamily='monospace';
-        if(ti===6)td.style.color='var(--green)';
-        if(ti===7)td.style.color='var(--amber)';
-        if(ti===8)td.style.color='var(--blue)';
+        if(ti===5)td.style.color='var(--blue)';
+        if(ti===7)td.style.color='var(--green)';
+        if(ti===8)td.style.color='var(--amber)';
+        if(ti===9)td.style.color='var(--blue)';
         td.textContent=txt;tr.appendChild(td);
       });
       tb.appendChild(tr);
@@ -1662,8 +1711,8 @@ function npCod(){
   var cat=el('np-cat').value,sub=el('np-sub').value,prefix=cat+'-'+sub+'-';
   var nums=[];PRODS.forEach(function(p){p.v.forEach(function(v){if(v.cod.indexOf(prefix)===0){var n=parseInt(v.cod.split('-')[2]);if(!isNaN(n))nums.push(n);}});});
   var next=nums.length?Math.max.apply(null,nums)+1:1;
-  var t=el('np-var0')?el('np-var0').value.trim():'';
-  el('np-cod').value=prefix+String(next).padStart(3,'0')+(t?'-'+t:'');
+  // Show format: same number for all variants
+  el('np-cod').value=prefix+String(next).padStart(3,'0')+'-[TALLE]';
 }
 el('np-add').addEventListener('click',function(){
   npVC++;var wrap=el('np-vars');
@@ -1678,14 +1727,16 @@ function saveNuevoProd(){
   var nom=el('np-nom').value.trim();if(!nom){toast('Ingresa el nombre');return;}
   var catV=el('np-cat').value,subV=el('np-sub').value,prefix=catV+'-'+subV+'-';
   var nums=[];PRODS.forEach(function(p){p.v.forEach(function(v){if(v.cod.indexOf(prefix)===0){var n=parseInt(v.cod.split('-')[2]);if(!isNaN(n))nums.push(n);}});});
-  var next=nums.length?Math.max.apply(null,nums)+1:1;
+  // ONE number for all variants of the same product
+  var prodNum=nums.length?Math.max.apply(null,nums)+1:1;
   var vars=[];
   for(var i=0;i<=npVC;i++){
     var varEl=el('np-var'+i),cosEl=el('np-cos'+i),plaEl=el('np-pla'+i);
     if(!varEl)continue;
     var t=varEl.value.trim(),costo=parseFloat(cosEl?cosEl.value:0)||0,pl=parseFloat(plaEl?plaEl.value:0)||0;
     if(!t||!pl)continue;
-    vars.push({t:t,cod:prefix+String(next).padStart(3,'0')+'-'+t,pl:pl,pe:Math.round(pl*0.85),costo:costo});next++;
+    vars.push({t:t,cod:prefix+String(prodNum).padStart(3,'0')+'-'+t,pl:pl,pe:Math.round(pl*0.85),costo:costo});
+    // prodNum stays the same for all variants
   }
   if(!vars.length){toast('Agrega al menos una variante con precio');return;}
   PRODS.push({n:nom,c:catL,s:subL,margen:1.1,rt:0.18,v:vars});
@@ -1901,17 +1952,51 @@ updCli();renderStock();renderProds();
 
 
 // ===== NAV =====
-var _NAV=['venta','ventas','clientes','compras','stock','productos','flujo','cierre','resumen'];
+var _NAV=['venta','ventas','clientes','compras','stock','productos','flujo','cierre','resumen','config'];
 function goTo(s){
   _NAV.forEach(function(x){var e=document.getElementById('sec-'+x);if(e)e.classList.remove('active');});
   document.querySelectorAll('.ni').forEach(function(x){x.classList.remove('active');});
   var e=document.getElementById('sec-'+s);if(e)e.classList.add('active');
   var ni=document.querySelectorAll('.ni')[_NAV.indexOf(s)];if(ni)ni.classList.add('active');
   var map={ventas:renderVentas,clientes:renderClientes,compras:renderCompras,
-    stock:renderStock,productos:renderProds,flujo:renderFlujo,cierre:renderCierre,resumen:renderResumen};
+    stock:renderStock,productos:renderProds,flujo:renderFlujo,cierre:renderCierre,resumen:renderResumen,config:renderConfig};
   if(map[s])map[s]();
   if(window.innerWidth<=768)document.getElementById('sidebar').classList.remove('mob-open');
 }
+
+// ===== CONFIGURACION =====
+var CONFIG = {coef: parseFloat(localStorage.getItem('snk_coef')||'0.2')};
+
+function saveConfig(){
+  var val = parseFloat(el('cfg-coef').value)||0;
+  CONFIG.coef = val;
+  localStorage.setItem('snk_coef', String(val));
+  updateCoefEjemplo();
+  toast('Configuracion guardada');
+}
+
+function updateCoefEjemplo(){
+  var ej = el('cfg-coef-ejemplo');
+  if(!ej) return;
+  var coef = CONFIG.coef;
+  if(coef > 0){
+    ej.textContent = 'Ejemplo: producto con costo $10.000 → costo real $' + Math.round(10000*(1+coef/100)).toLocaleString('es-AR') + ' (suma $' + Math.round(10000*coef/100).toLocaleString('es-AR') + ' de costos fijos)';
+  } else {
+    ej.textContent = 'Ingresa un porcentaje para ver el efecto en los costos';
+  }
+}
+
+function renderConfig(){
+  var inp = el('cfg-coef');
+  if(inp) inp.value = CONFIG.coef;
+  updateCoefEjemplo();
+}
+
+function getCostoReal(costo){
+  return Math.round(costo * (1 + CONFIG.coef/100));
+}
+
+// ===== CONFIGURACION END =====
 
 // Close modals & dropdowns
 document.querySelectorAll('.mo').forEach(function(m){
