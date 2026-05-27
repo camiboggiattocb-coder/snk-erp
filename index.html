@@ -1717,14 +1717,18 @@ function editProd(pIdx){
   h += '<div id="ed-vars">';
   p.v.forEach(function(v, i){ h += edVarRow(v, i); });
   h += '</div>';
+  h += '<button class="btn bo bsm" onclick="edAddVar()" style="margin-bottom:12px">+ Agregar variante</button>';
   el('ed-body').innerHTML = h;
   openMo('mo-edit');
 }
 
 function edVarRow(v, i){
   var s = '';
-  s += '<div style="border:1px solid var(--brd);border-radius:8px;padding:8px;margin-bottom:8px">';
-  s += '<div style="font-size:11px;color:var(--txt3);margin-bottom:4px">Cod: ' + escAttr(v.cod||'') + '</div>';
+  s += '<div class="ed-var" data-i="'+i+'" style="border:1px solid var(--brd);border-radius:8px;padding:8px;margin-bottom:8px;position:relative">';
+  s += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+  s += '<input type="text" id="ed-cod' + i + '" value="' + escAttr(v.cod||'') + '" style="font-size:11px;color:var(--txt3);background:none;border:none;font-family:monospace;flex:1;padding:0" placeholder="Codigo">';
+  s += '<button class="btn bo bsm" onclick="edDelVar('+i+')" style="color:#c5384b;margin-left:8px">Quitar</button>';
+  s += '</div>';
   s += '<div class="r4">';
   s += '<div class="field"><label>Talle</label><input type="text" id="ed-t' + i + '" value="' + escAttr(v.t||'') + '"></div>';
   s += '<div class="field"><label>Costo ($)</label><input type="number" id="ed-costo' + i + '" value="' + (v.costo||0) + '"></div>';
@@ -1735,6 +1739,53 @@ function edVarRow(v, i){
   return s;
 }
 
+function edAddVar(){
+  if(_editIdx < 0) return;
+  var p = PRODS[_editIdx];
+  var base = '';
+  if(p.v.length && p.v[0].cod){
+    var parts = p.v[0].cod.split('-');
+    if(parts.length >= 3) base = parts.slice(0,3).join('-') + '-';
+  }
+  var rows = document.querySelectorAll('#ed-vars .ed-var');
+  var tempVars = [];
+  rows.forEach(function(row){
+    var i = row.getAttribute('data-i');
+    tempVars.push({
+      cod: el('ed-cod'+i) ? el('ed-cod'+i).value : '',
+      t:   el('ed-t'+i)   ? el('ed-t'+i).value   : '',
+      costo: el('ed-costo'+i) ? parseFloat(el('ed-costo'+i).value)||0 : 0,
+      pl:  el('ed-pl'+i)  ? parseFloat(el('ed-pl'+i).value)||0 : 0,
+      pe:  el('ed-pe'+i)  ? parseFloat(el('ed-pe'+i).value)||0 : 0
+    });
+  });
+  tempVars.push({cod: base + '?', t:'', costo:0, pl:0, pe:0});
+  var html = '';
+  tempVars.forEach(function(v, i){ html += edVarRow(v, i); });
+  el('ed-vars').innerHTML = html;
+}
+
+function edDelVar(i){
+  var rows = document.querySelectorAll('#ed-vars .ed-var');
+  if(rows.length <= 1){ toast('El producto debe tener al menos una variante'); return; }
+  if(!confirm('Quitar esta variante?')) return;
+  var tempVars = [];
+  rows.forEach(function(row){
+    var idx = row.getAttribute('data-i');
+    if(parseInt(idx) === i) return;
+    tempVars.push({
+      cod: el('ed-cod'+idx) ? el('ed-cod'+idx).value : '',
+      t:   el('ed-t'+idx)   ? el('ed-t'+idx).value   : '',
+      costo: el('ed-costo'+idx) ? parseFloat(el('ed-costo'+idx).value)||0 : 0,
+      pl:  el('ed-pl'+idx)  ? parseFloat(el('ed-pl'+idx).value)||0 : 0,
+      pe:  el('ed-pe'+idx)  ? parseFloat(el('ed-pe'+idx).value)||0 : 0
+    });
+  });
+  var html = '';
+  tempVars.forEach(function(v, k){ html += edVarRow(v, k); });
+  el('ed-vars').innerHTML = html;
+}
+
 function saveEdit(){
   if(_editIdx < 0) return;
   var p = PRODS[_editIdx];
@@ -1742,16 +1793,23 @@ function saveEdit(){
   p.n = el('ed-nom').value.trim() || p.n;
   p.c = el('ed-cat').value.trim() || p.c;
   p.s = el('ed-sub').value.trim() || p.s;
-  p.v.forEach(function(v, i){
-    var t  = el('ed-t' + i);
-    var co = el('ed-costo' + i);
-    var pl = el('ed-pl' + i);
-    var pe = el('ed-pe' + i);
-    if(t)  v.t     = t.value.trim();
-    if(co) v.costo = parseFloat(co.value) || 0;
-    if(pl) v.pl    = parseFloat(pl.value) || 0;
-    if(pe) v.pe    = parseFloat(pe.value) || 0;
+  var rows = document.querySelectorAll('#ed-vars .ed-var');
+  var newVars = [];
+  rows.forEach(function(row){
+    var i = row.getAttribute('data-i');
+    var cod = el('ed-cod'+i) ? el('ed-cod'+i).value.trim() : '';
+    var t   = el('ed-t'+i)   ? el('ed-t'+i).value.trim()   : '';
+    if(!cod || !t) return;
+    newVars.push({
+      cod: cod,
+      t: t,
+      costo: el('ed-costo'+i) ? parseFloat(el('ed-costo'+i).value)||0 : 0,
+      pl:    el('ed-pl'+i)    ? parseFloat(el('ed-pl'+i).value)||0    : 0,
+      pe:    el('ed-pe'+i)    ? parseFloat(el('ed-pe'+i).value)||0    : 0
+    });
   });
+  if(!newVars.length){ toast('El producto debe tener al menos una variante'); return; }
+  p.v = newVars;
   DB.p = PRODS;
   saveProdNow();
   closeMo('mo-edit');
