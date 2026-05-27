@@ -53,6 +53,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--acc)}
 textarea{resize:vertical;min-height:60px}
 .r2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .r3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.r4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px}
+@media(max-width:768px){.r4{grid-template-columns:1fr 1fr}}
 .btn{display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:var(--r);font-size:13px;font-weight:500;cursor:pointer;border:none;font-family:inherit;white-space:nowrap;transition:all .1s}
 .bp{background:var(--acc);color:var(--acc-fg)}.bp:hover{opacity:.85}
 .bo{background:none;border:1px solid var(--brd2);color:var(--txt)}.bo:hover{background:var(--surf2)}
@@ -702,6 +704,16 @@ textarea{resize:vertical;min-height:60px}
     <div style="display:flex;gap:8px">
       <button class="btn bp" style="flex:1" onclick="saveNuevoProd()">Guardar producto</button>
       <button class="btn bo" onclick="closeMo('mo-prod')">Cancelar</button>
+    </div>
+  </div>
+</div>
+<div class="mo" id="mo-edit">
+  <div class="md mdl">
+    <div class="mh"><div class="mt2">Editar producto</div><button class="mc2" onclick="closeMo('mo-edit')">&#215;</button></div>
+    <div id="ed-body"></div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn bp" style="flex:1" onclick="saveEdit()">Guardar cambios</button>
+      <button class="btn bo" onclick="closeMo('mo-edit')">Cancelar</button>
     </div>
   </div>
 </div>
@@ -1676,6 +1688,79 @@ function saveBulkStock(){
   fbSave();closeMo('mo-stock-bulk');renderStock();toast('Stock guardado');
 }
 
+var _editIdx = -1;
+
+function delVariante(pIdx, vIdx){
+  var p = PRODS[pIdx];
+  if(!p || !p.v[vIdx]) return;
+  var nombre = p.n + ' - Talle ' + p.v[vIdx].t + ' (' + p.v[vIdx].cod + ')';
+  if(!confirm('Eliminar la linea:\n\n' + nombre + '\n\nEsta accion no se puede deshacer.')) return;
+  p.v.splice(vIdx, 1);
+  if(p.v.length === 0){ PRODS.splice(pIdx, 1); }
+  DB.p = PRODS;
+  saveProdNow();
+  renderProds();
+  toast('Linea eliminada');
+}
+
+function editProd(pIdx){
+  var p = PRODS[pIdx];
+  if(!p) return;
+  _editIdx = pIdx;
+  var h = '';
+  h += '<div class="r2">';
+  h += '<div class="field"><label>Categoria</label><input type="text" id="ed-cat" value="' + escAttr(p.c) + '"></div>';
+  h += '<div class="field"><label>Subcategoria</label><input type="text" id="ed-sub" value="' + escAttr(p.s) + '"></div>';
+  h += '</div>';
+  h += '<div class="field" style="margin-top:8px"><label>Nombre</label><input type="text" id="ed-nom" value="' + escAttr(p.n) + '"></div>';
+  h += '<div class="card-t" style="margin:12px 0 8px">Variantes (talles)</div>';
+  h += '<div id="ed-vars">';
+  p.v.forEach(function(v, i){ h += edVarRow(v, i); });
+  h += '</div>';
+  el('ed-body').innerHTML = h;
+  openMo('mo-edit');
+}
+
+function edVarRow(v, i){
+  var s = '';
+  s += '<div style="border:1px solid var(--brd);border-radius:8px;padding:8px;margin-bottom:8px">';
+  s += '<div style="font-size:11px;color:var(--txt3);margin-bottom:4px">Cod: ' + escAttr(v.cod||'') + '</div>';
+  s += '<div class="r4">';
+  s += '<div class="field"><label>Talle</label><input type="text" id="ed-t' + i + '" value="' + escAttr(v.t||'') + '"></div>';
+  s += '<div class="field"><label>Costo ($)</label><input type="number" id="ed-costo' + i + '" value="' + (v.costo||0) + '"></div>';
+  s += '<div class="field"><label>P. lista ($)</label><input type="number" id="ed-pl' + i + '" value="' + (v.pl||0) + '"></div>';
+  s += '<div class="field"><label>P. efectivo ($)</label><input type="number" id="ed-pe' + i + '" value="' + (v.pe||0) + '"></div>';
+  s += '</div>';
+  s += '</div>';
+  return s;
+}
+
+function saveEdit(){
+  if(_editIdx < 0) return;
+  var p = PRODS[_editIdx];
+  if(!p) return;
+  p.n = el('ed-nom').value.trim() || p.n;
+  p.c = el('ed-cat').value.trim() || p.c;
+  p.s = el('ed-sub').value.trim() || p.s;
+  p.v.forEach(function(v, i){
+    var t  = el('ed-t' + i);
+    var co = el('ed-costo' + i);
+    var pl = el('ed-pl' + i);
+    var pe = el('ed-pe' + i);
+    if(t)  v.t     = t.value.trim();
+    if(co) v.costo = parseFloat(co.value) || 0;
+    if(pl) v.pl    = parseFloat(pl.value) || 0;
+    if(pe) v.pe    = parseFloat(pe.value) || 0;
+  });
+  DB.p = PRODS;
+  saveProdNow();
+  closeMo('mo-edit');
+  renderProds();
+  _editIdx = -1;
+  toast('Producto actualizado');
+}
+
+function escAttr(s){ return String(s==null?'':s).replace(/"/g,'&quot;'); }
 // ===== PRODUCTOS =====
 var npVC=0;
 function renderProds(){
@@ -1684,9 +1769,9 @@ function renderProds(){
   var ss=el('pf-sub'),prev=ss.value;
   ss.innerHTML='<option value="">Todas las subcat.</option>'+subs.map(function(s){return '<option '+(s===prev?'selected':'')+'>'+s+'</option>';}).join('');
   var tb=el('prod-tb');tb.innerHTML='';var cnt=0;
-  PRODS.forEach(function(p){
+  PRODS.forEach(function(p, pIdx){
     if(cat&&p.c!==cat)return;if(sub&&p.s!==sub)return;
-    p.v.forEach(function(v){
+    p.v.forEach(function(v, vIdx){
       if(q&&p.n.toLowerCase().indexOf(q)<0&&v.cod.toLowerCase().indexOf(q)<0)return;cnt++;
       var debito=Math.round(v.pe*1.05);
       var tcneto=Math.round(v.pl*0.85);
@@ -1702,6 +1787,16 @@ function renderProds(){
         if(ti===9)td.style.color='var(--blue)';
         td.textContent=txt;tr.appendChild(td);
       });
+      var tdAcc=document.createElement('td');
+      tdAcc.style.whiteSpace='nowrap';
+      var bE=document.createElement('button');
+      bE.className='btn bo bsm';bE.textContent='Editar';bE.style.marginRight='4px';
+      bE.onclick=function(){editProd(pIdx);};
+      var bD=document.createElement('button');
+      bD.className='btn bo bsm';bD.textContent='Eliminar';bD.style.color='#c5384b';
+      bD.onclick=function(){delVariante(pIdx, vIdx);};
+      tdAcc.appendChild(bE);tdAcc.appendChild(bD);
+      tr.appendChild(tdAcc);
       tb.appendChild(tr);
     });
   });
@@ -1741,7 +1836,7 @@ function saveNuevoProd(){
   if(!vars.length){toast('Agrega al menos una variante con precio');return;}
   PRODS.push({n:nom,c:catL,s:subL,margen:1.1,rt:0.18,v:vars});
   DB.p=PRODS;vars.forEach(function(v){if(DB.s[v.cod]===undefined)DB.s[v.cod]=0;});
-  fbSave();closeMo('mo-prod');el('np-nom').value='';el('np-cod').value='';
+  saveProdNow();fbSave();closeMo('mo-prod');el('np-nom').value='';el('np-cod').value='';
   el('np-vars').innerHTML='<div class="r3" style="margin-bottom:8px"><div class="field"><label>Talle</label><input type="text" id="np-var0" placeholder="Ej: M" oninput="npCod()"></div><div class="field"><label>Costo ($)</label><input type="number" id="np-cos0" placeholder="0"></div><div class="field"><label>Precio lista ($)</label><input type="number" id="np-pla0" placeholder="0"></div></div>';
   npVC=0;renderProds();toast('Producto creado');
 }
