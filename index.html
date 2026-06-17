@@ -247,7 +247,7 @@ textarea{resize:vertical;min-height:60px}
               <option value="Transferencia">Transferencia</option>
               <option value="Debito">D&#233;bito</option>
               <option value="Tarjeta local">Tarjeta local</option>
-              <option value="Tarjeta credito">Tarjeta de cr&#233;dito</option>
+              <option value="Tarjeta credito">Tarjeta de cr&#233;dito</option><option value="VIUMI">VIUMI</option>
               <option value="FASTCRED">FASTCRED</option>
               <option value="FINAN YA">FINAN YA</option>
               <option value="Cuenta corriente">Cuenta corriente</option>
@@ -314,7 +314,7 @@ textarea{resize:vertical;min-height:60px}
   <div class="ph">
     <div><div class="pt">Historial de ventas</div><div class="ps" id="ventas-ps"></div></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn bo bsm" onclick="exportVentasCSV()">&#8595; CSV</button>
+      <button class="btn bo bsm" onclick="exportVentasExcel()">&#8595; Excel</button>
       <button class="btn bo bsm" onclick="exportVentasPDF()">&#8595; PDF</button>
       <button class="btn bp bsm" onclick="goTo('venta')">+ Nueva venta</button>
     </div>
@@ -980,13 +980,14 @@ var MEDIOS = {
   'Debito':           {desc:0.15, rec:0.05, dias:0,  neto:1.0},
   'Tarjeta local':    {desc:0,    rec:0,    dias:1,  neto:1.0},
   'Tarjeta credito':  {desc:0,    rec:0,    dias:1,  neto:0.85},
+  'VIUMI':            {desc:0,    rec:0,    dias:2,  neto:0.85},
   'FASTCRED':         {desc:0.15, rec:0,    dias:7,  neto:1.0},
   'FINAN YA':         {desc:0.15, rec:0.05, dias:10, neto:1.0},
   'Cuenta corriente': {desc:0.15, rec:0,    dias:-1, neto:1.0},
 };
 var MEDIOS_LABEL = {
   'Efectivo':'Efectivo','Transferencia':'Transferencia','Debito':'Débito',
-  'Tarjeta local':'Tarjeta local','Tarjeta credito':'Tarjeta crédito',
+  'Tarjeta local':'Tarjeta local','Tarjeta credito':'Tarjeta crédito','VIUMI':'VIUMI',
   'FASTCRED':'FASTCRED','FINAN YA':'FINAN YA','Cuenta corriente':'Cta. cte.'
 };
 
@@ -1370,7 +1371,7 @@ function renderVentas(){
     addTd(v.items.length+' item'+(v.items.length>1?'s':''),'muted');
     addTd(MEDIOS_LABEL[v.medio]||v.medio,'');
     addTd(v.canal,'muted');
-    var tdest=addTd('','');tdest.innerHTML='<span class="badge '+(BCLS[v.estado]||'bgr')+'">'+v.estado+'</span>';
+    var tdest=addTd('','');tdest.innerHTML='<span class="badge '+(BCLS[v.estado]||'bgr')+'">'+v.estado+'</span>'+(v.editado?' <span title="Editada el '+fmtD(v.editado)+'" style="font-size:11px;color:var(--amber);margin-left:4px">✏️</span>':'');
     var tdtot=addTd('','');tdtot.style.fontWeight='700';tdtot.style.fontFamily='monospace';tdtot.textContent=fmt(v.total);
     // acred col
     var tdac=addTd('','');
@@ -1399,6 +1400,7 @@ function verVenta(id){
   var b=el('vdet-body');b.innerHTML='';
   var g=mk('div','r2');g.style.cssText='margin-bottom:12px;font-size:13px';
   var pairs=[['Fecha',fmtD(v.fecha)],['Medio',MEDIOS_LABEL[v.medio]||v.medio],['Canal',v.canal],['Estado',v.estado]];
+  if(v.editado)pairs.push(['Editada el',fmtD(v.editado)]);
   if(v.cliente)pairs.push(['Cliente',v.cliente]);
   if(v.obs)pairs.push(['Obs',v.obs]);
   if(v.fechaAcred)pairs.push(['Acredita',fmtD(v.fechaAcred)]);
@@ -1614,21 +1616,72 @@ function saveVentaEdit(){
   if(!_vedItems.length){alert('La venta debe tener al menos un item.');return;}
   var nuevoTotal=_vedItems.reduce(function(a,it){return a+(it.precio_unit||0)*(it.qty||0);},0);
   var diff=nuevoTotal-_vedOrigTotal;
-  var msg='Confirmar cambios?\n\nTotal anterior: '+fmt(_vedOrigTotal)+'\nTotal nuevo: '+fmt(nuevoTotal);
-  if(diff!==0)msg+='\nDiferencia: '+(diff>0?'+':'')+fmt(diff)+'\n\n'+(diff>0?'El cliente debe pagar '+fmt(Math.abs(diff)):'Se debe devolver '+fmt(Math.abs(diff)))+' al cliente.';
-  msg+='\n\nEl stock se ajustara automaticamente.';
+  var hoy=tod();
+  var esOtraFecha=v.fecha!==hoy;
+  // Calcular cuanto ya esta pagado de la venta original
+  var pagadoOriginal=(v.pagos||[]).reduce(function(a,p){return a+(p.monto||0);},0);
+  
+  // Mensaje de confirmacion
+  var msg='Confirmar cambios?\n\n';
+  msg+='Total anterior: '+fmt(_vedOrigTotal)+'\n';
+  msg+='Total nuevo:    '+fmt(nuevoTotal)+'\n';
+  if(diff!==0){
+    msg+='Diferencia:     '+(diff>0?'+':'')+fmt(diff)+'\n\n';
+    if(diff>0){
+      msg+='El cliente debe pagar '+fmt(Math.abs(diff))+' mas.\n';
+      msg+='La venta quedara como PARCIAL con saldo a cobrar.\n';
+    } else {
+      msg+='Saldo a favor del cliente: '+fmt(Math.abs(diff))+'.\n';
+      msg+='La venta quedara registrada con el nuevo total.\n';
+      msg+='(podes compensar con otro producto en otra operacion)\n';
+    }
+  }
+  msg+='\nEl stock se ajustara automaticamente.';
+  if(esOtraFecha){
+    msg+='\n\nATENCION: esta venta es del '+fmtD(v.fecha)+', no de hoy.';
+    msg+='\nLa edicion afectara el flujo del dia '+fmtD(v.fecha)+'.';
+  }
   if(!confirm(msg))return;
+  
+  // 1) Ajustar stock: devolver lo de la venta original, descontar lo nuevo
   v.items.forEach(function(it){DB.s[it.cod]=(DB.s[it.cod]||0)+(it.qty||0);});
   _vedItems.forEach(function(it){DB.s[it.cod]=Math.max(0,(DB.s[it.cod]||0)-(it.qty||0));});
+  
+  // 2) Recalcular totalNeto proporcionalmente
   var factor=_vedOrigTotal>0?(nuevoTotal/_vedOrigTotal):1;
   v.totalNeto=Math.round((v.totalNeto||v.total)*factor);
+  
+  // 3) Actualizar items y total
   v.items=_vedItems.map(function(it){return {
     cod:it.cod,nombre:it.nombre,cat:it.cat,sub:it.sub,variante:it.variante,
     qty:it.qty,precio_unit:it.precio_unit,subtotal:(it.precio_unit||0)*(it.qty||0),
     costo:it.costo,descPct:it.descPct||0
   };});
   v.total=nuevoTotal;
-  v.editado=tod();
+  v.editado=hoy;
+  
+  // 4) Manejar estado segun diferencia entre pagado y nuevo total
+  if(nuevoTotal>pagadoOriginal){
+    // Queda saldo a cobrar
+    if(pagadoOriginal>0){
+      v.estado='Parcial';
+    } else {
+      // No tenia pagos: mantiene su estado original (Pendiente o lo que fuera)
+      if(v.estado==='Pagado')v.estado='Pendiente';
+    }
+  } else if(nuevoTotal<=pagadoOriginal){
+    // El nuevo total es menor o igual a lo ya pagado: queda Pagado
+    v.estado='Pagado';
+    // Si quedo saldo a favor del cliente, ajustamos para que pagos no superen total
+    // (no devolvemos plata automaticamente, solo limitamos)
+    if(pagadoOriginal>nuevoTotal){
+      // Saldo a favor existe pero no se registra como movimiento de flujo
+      // Solo dejamos constancia en obs
+      var aFavor=pagadoOriginal-nuevoTotal;
+      v.obs=(v.obs?v.obs+' | ':'')+'Edicion '+hoy+': saldo a favor del cliente $'+fmt(aFavor).replace('$','');
+    }
+  }
+  
   DB.v=_V;
   fbSave();
   saveStockNow();
@@ -1636,7 +1689,9 @@ function saveVentaEdit(){
   renderVentas();
   if(typeof renderStock==='function'){var s=document.querySelector('.sec.active');if(s&&s.id==='sec-stock')renderStock();}
   _vedId=null;_vedItems=[];_vedOrigTotal=0;
-  toast('Venta actualizada');
+  if(diff>0)toast('Venta actualizada. Queda saldo a cobrar de '+fmt(diff));
+  else if(diff<0)toast('Venta actualizada. Saldo a favor: '+fmt(Math.abs(diff)));
+  else toast('Venta actualizada');
 }
 
 
@@ -1651,14 +1706,54 @@ function getVentasFiltradas(){
     return true;
   });
 }
-function exportVentasCSV(){
+function exportVentasExcel(){
   var vv=getVentasFiltradas();if(!vv.length){toast('Sin ventas');return;}
-  var rows=['Fecha,Cliente,Items,Medio,Canal,Estado,Total,Neto acreditado,Fecha acreditacion'];
+  if(typeof XLSX==='undefined'){alert('La libreria Excel no cargo. Revisa tu conexion.');return;}
+  var per=(vfDes&&vfHas)?fmtD(vfDes)+' al '+fmtD(vfHas):'Todo el periodo';
+  var total=vv.reduce(function(a,v){return a+v.total;},0);
+  var pend=vv.filter(function(v){return v.estado!=='Pagado';}).reduce(function(a,v){return a+v.total;},0);
+  var data=[];
+  data.push(['SNK ERP - Resumen de ventas']);
+  data.push(['Periodo: '+per]);
+  data.push(['Generado: '+new Date().toLocaleString('es-AR')]);
+  data.push([]);
+  data.push(['Fecha','Cliente','Medio de cobro','Canal','Estado','Total','Neto acreditado','Fecha acreditacion']);
   vv.forEach(function(v){
-    rows.push([v.fecha,v.cliente||'',v.items.map(function(i){return i.nombre+' '+i.variante+' x'+i.qty;}).join('|'),
-      MEDIOS_LABEL[v.medio]||v.medio,v.canal,v.estado,v.total,v.totalNeto||v.total,v.fechaAcred||''].join(','));
+    data.push([
+      fmtD(v.fecha),
+      v.cliente||'',
+      MEDIOS_LABEL[v.medio]||v.medio||'',
+      v.canal||'',
+      v.estado||'',
+      v.total||0,
+      v.totalNeto||v.total||0,
+      v.fechaAcred?fmtD(v.fechaAcred):'Al cobrar'
+    ]);
   });
-  dlcsv(rows.join('\n'),'ventas_snk.csv');
+  data.push([]);
+  data.push(['','','','','Total facturado:',total]);
+  data.push(['','','','','Pendiente de cobro:',pend]);
+  
+  var ws=XLSX.utils.aoa_to_sheet(data);
+  ws['!cols']=[
+    {wch:12},  // Fecha
+    {wch:28},  // Cliente
+    {wch:20},  // Medio
+    {wch:14},  // Canal
+    {wch:12},  // Estado
+    {wch:16},  // Total
+    {wch:18},  // Neto
+    {wch:18}   // Fecha acred
+  ];
+  ws['!merges']=[
+    {s:{r:0,c:0},e:{r:0,c:7}},
+    {s:{r:1,c:0},e:{r:1,c:7}},
+    {s:{r:2,c:0},e:{r:2,c:7}}
+  ];
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Ventas');
+  var fn='ventas_snk_'+(new Date().toISOString().split('T')[0])+'.xlsx';
+  XLSX.writeFile(wb,fn);
 }
 function exportVentasPDF(){
   var vv=getVentasFiltradas();if(!vv.length){toast('Sin ventas');return;}
