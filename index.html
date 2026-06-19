@@ -1712,16 +1712,46 @@ function exportVentasExcel(){
   var per=(vfDes&&vfHas)?fmtD(vfDes)+' al '+fmtD(vfHas):'Todo el periodo';
   var total=vv.reduce(function(a,v){return a+v.total;},0);
   var pend=vv.filter(function(v){return v.estado!=='Pagado';}).reduce(function(a,v){return a+v.total;},0);
+  // Acumular totales por categoria para el resumen final
+  var totalesPorCat={};
+  
   var data=[];
   data.push(['SNK ERP - Resumen de ventas']);
   data.push(['Periodo: '+per]);
   data.push(['Generado: '+new Date().toLocaleString('es-AR')]);
   data.push([]);
-  data.push(['Fecha','Cliente','Medio de cobro','Canal','Estado','Total','Neto acreditado','Fecha acreditacion']);
+  data.push(['Fecha','Cliente','Categoria','Monto categoria','Medio de cobro','Canal','Estado','Total venta','Neto acreditado','Fecha acreditacion']);
+  
   vv.forEach(function(v){
+    // Agrupar items de la venta por categoria
+    var porCat={};
+    (v.items||[]).forEach(function(it){
+      var cat=it.cat||'Sin categoria';
+      if(!porCat[cat])porCat[cat]=0;
+      porCat[cat]+=(it.subtotal||(it.precio_unit||0)*(it.qty||0)||0);
+    });
+    var cats=Object.keys(porCat).sort();
+    
+    // Filas de categorias (sin datos de venta)
+    cats.forEach(function(c){
+      data.push([
+        fmtD(v.fecha),
+        v.cliente||'',
+        c,
+        porCat[c],
+        '','','','','',''
+      ]);
+      // Acumular para resumen final
+      if(!totalesPorCat[c])totalesPorCat[c]=0;
+      totalesPorCat[c]+=porCat[c];
+    });
+    
+    // Fila de TOTAL de la venta con los datos
     data.push([
-      fmtD(v.fecha),
-      v.cliente||'',
+      '',
+      '',
+      'Total',
+      '',
       MEDIOS_LABEL[v.medio]||v.medio||'',
       v.canal||'',
       v.estado||'',
@@ -1729,26 +1759,37 @@ function exportVentasExcel(){
       v.totalNeto||v.total||0,
       v.fechaAcred?fmtD(v.fechaAcred):'Al cobrar'
     ]);
+    // Fila vacia para separar ventas visualmente
+    data.push([]);
+  });
+  
+  // Resumen final
+  data.push([]);
+  data.push(['TOTALES POR CATEGORIA']);
+  Object.keys(totalesPorCat).sort().forEach(function(c){
+    data.push(['','',c,totalesPorCat[c]]);
   });
   data.push([]);
-  data.push(['','','','','Total facturado:',total]);
-  data.push(['','','','','Pendiente de cobro:',pend]);
+  data.push(['','','','','','','','Total facturado:',total]);
+  data.push(['','','','','','','','Pendiente de cobro:',pend]);
   
   var ws=XLSX.utils.aoa_to_sheet(data);
   ws['!cols']=[
     {wch:12},  // Fecha
     {wch:28},  // Cliente
+    {wch:18},  // Categoria
+    {wch:16},  // Monto categoria
     {wch:20},  // Medio
     {wch:14},  // Canal
     {wch:12},  // Estado
-    {wch:16},  // Total
+    {wch:16},  // Total venta
     {wch:18},  // Neto
     {wch:18}   // Fecha acred
   ];
   ws['!merges']=[
-    {s:{r:0,c:0},e:{r:0,c:7}},
-    {s:{r:1,c:0},e:{r:1,c:7}},
-    {s:{r:2,c:0},e:{r:2,c:7}}
+    {s:{r:0,c:0},e:{r:0,c:9}},
+    {s:{r:1,c:0},e:{r:1,c:9}},
+    {s:{r:2,c:0},e:{r:2,c:9}}
   ];
   var wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'Ventas');
@@ -1760,14 +1801,43 @@ function exportVentasPDF(){
   var total=vv.reduce(function(a,v){return a+v.total;},0);
   var pend=vv.filter(function(v){return v.estado!=='Pagado';}).reduce(function(a,v){return a+v.total;},0);
   var per=(vfDes&&vfHas)?fmtD(vfDes)+' al '+fmtD(vfHas):'Todo el período';
-  var html='<html><head><meta charset="UTF-8"><style>body{font-family:Arial,sans-serif;font-size:12px;padding:20px}h1{font-size:18px;margin-bottom:4px}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{padding:7px 10px;border:1px solid #ddd;text-align:left}th{background:#f5f5f5;font-weight:600}tr:nth-child(even){background:#fafafa}.tot{margin-top:14px;font-size:14px;font-weight:600}</style></head><body>';
-  html+='<h1>SNK — Resumen de ventas</h1><p>Período: '+per+'</p>';
-  html+='<table><thead><tr><th>Fecha</th><th>Cliente</th><th>Medio</th><th>Estado</th><th>Total</th><th>Acredita</th></tr></thead><tbody>';
+  var totalesPorCat={};
+  var h='<html><head><meta charset="UTF-8"><style>body{font-family:Arial,sans-serif;font-size:11px;padding:20px}h1{font-size:18px;margin-bottom:4px}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{padding:6px 8px;border:1px solid #ddd;text-align:left;font-size:11px}th{background:#f5f5f5;font-weight:600}.tot-row{background:#f0f0f0;font-weight:600}.tot-row td{border-top:2px solid #999}.cat-row td{color:#666}.tot{margin-top:14px;font-size:14px;font-weight:600}.resumen{margin-top:20px;padding:12px;background:#f5f5f5;border-radius:4px}.resumen h2{font-size:14px;margin:0 0 8px 0}.resumen-row{display:flex;justify-content:space-between;padding:3px 0;font-size:12px}</style></head><body>';
+  h+='<h1>SNK — Resumen de ventas</h1><p>Período: '+per+'</p>';
+  h+='<table><thead><tr><th>Fecha</th><th>Cliente</th><th>Categoría</th><th style="text-align:right">Monto</th><th>Medio</th><th>Estado</th><th style="text-align:right">Total venta</th><th>Acredita</th></tr></thead><tbody>';
+  
   vv.forEach(function(v){
-    html+='<tr><td>'+fmtD(v.fecha)+'</td><td>'+(v.cliente||'—')+'</td><td>'+(MEDIOS_LABEL[v.medio]||v.medio)+'</td><td>'+v.estado+'</td><td>'+fmt(v.total)+'</td><td>'+(v.fechaAcred?fmtD(v.fechaAcred):'Al cobrar')+'</td></tr>';
+    // Agrupar items por categoria
+    var porCat={};
+    (v.items||[]).forEach(function(it){
+      var cat=it.cat||'Sin categoría';
+      if(!porCat[cat])porCat[cat]=0;
+      porCat[cat]+=(it.subtotal||(it.precio_unit||0)*(it.qty||0)||0);
+    });
+    var cats=Object.keys(porCat).sort();
+    
+    // Filas de categorias
+    cats.forEach(function(c){
+      h+='<tr class="cat-row"><td>'+fmtD(v.fecha)+'</td><td>'+(v.cliente||'—')+'</td><td>'+c+'</td><td style="text-align:right;font-family:monospace">'+fmt(porCat[c])+'</td><td></td><td></td><td></td><td></td></tr>';
+      if(!totalesPorCat[c])totalesPorCat[c]=0;
+      totalesPorCat[c]+=porCat[c];
+    });
+    
+    // Fila Total de la venta
+    h+='<tr class="tot-row"><td></td><td></td><td>Total</td><td></td><td>'+(MEDIOS_LABEL[v.medio]||v.medio||'')+'</td><td>'+(v.estado||'')+'</td><td style="text-align:right;font-family:monospace">'+fmt(v.total)+'</td><td>'+(v.fechaAcred?fmtD(v.fechaAcred):'Al cobrar')+'</td></tr>';
   });
-  html+='</tbody></table><div class="tot">Total facturado: '+fmt(total)+' | Pendiente cobro: '+fmt(pend)+'</div></body></html>';
-  var w=window.open('','_blank');w.document.write(html);w.document.close();w.print();
+  
+  h+='</tbody></table>';
+  
+  // Resumen por categoría
+  h+='<div class="resumen"><h2>Totales por categoría</h2>';
+  Object.keys(totalesPorCat).sort().forEach(function(c){
+    h+='<div class="resumen-row"><span>'+c+'</span><span style="font-family:monospace">'+fmt(totalesPorCat[c])+'</span></div>';
+  });
+  h+='</div>';
+  
+  h+='<div class="tot">Total facturado: '+fmt(total)+' | Pendiente cobro: '+fmt(pend)+'</div></body></html>';
+  var w=window.open('','_blank');w.document.write(h);w.document.close();w.print();
 }
 
 // ===== CLIENTES =====
